@@ -1,3 +1,5 @@
+using FiniteElements
+
 function create_cantilever_beam_linear(beam_length, beam_height, nx, ny, applied_force)
     # Parameters:
     # length: Length of the beam in the x-direction
@@ -36,7 +38,7 @@ function create_cantilever_beam_linear(beam_length, beam_height, nx, ny, applied
     end
 
     # Generate fixed DOFs (nodes on the left side of the beam)
-    fixed_dofs = []
+    fixed_dofs = Int[]
     for j in 1:n_nodes_y
         node_id = (j - 1) * n_nodes_x + 1  # Left side nodes (x = 0)
         push!(fixed_dofs, 2*node_id - 1)  # Fix x direction
@@ -60,20 +62,18 @@ beam_length = 1000.0  # Length of the beam
 beam_height = 100.0   # Height of the beam
 nx = 100         # Number of elements in x-direction
 ny = 10         # Number of elements in y-direction
-applied_force = 10  # Total force applied along the right side in -y direction
+applied_force = 1e4  # Total force applied along the right side in -y direction
 
 nodes, elements, forces, fixed_dofs = create_cantilever_beam_linear(beam_length, beam_height, nx, ny, applied_force)
 
-##
-material = Material(1e5, 0.3)
-u = solve_fem(nodes, elements, material, forces, fixed_dofs)
+material = Material(1e5, 0.3, 6)
 
+u, K, f = solve_fem_linear(nodes, elements, material, forces, fixed_dofs)
 
 ##
 using GLMakie
 
 fig = Figure()
 ax1 = Axis(fig[1,1]; aspect=DataAspect())
-scatter!(ax1, nodes .+ 1 .* u, color=u[2,:])
-# scatter!(ax1, nodes, color=u[2,:])
+scatter!(ax1, nodes .+ 2 .* u, color=u[2,:], markersize=5)
 fig

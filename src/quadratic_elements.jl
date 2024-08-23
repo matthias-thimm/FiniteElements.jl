@@ -1,27 +1,9 @@
-using LinearAlgebra, SparseArrays
-
-# Define the material properties (Plane stress)
-struct Material
-    E::Float64  # Young's modulus
-    ν::Float64  # Poisson's ratio
-end
-
-function plane_stress_stiffness(material::Material)
-    E, ν = material.E, material.ν
-    factor = E / (1.0 - ν^2)
-    D = factor * [1.0    ν      0.0;
-                  ν      1.0    0.0;
-                  0.0    0.0    (1.0 - ν) / 2.0]
-    return D
-end
-
 # 3x3 Gaussian quadrature points and weights for quadratic elements
-const GAUSS_POINTS_3x3 = [-sqrt(3/5), 0.0, sqrt(3/5)]
-const GAUSS_WEIGHTS_3x3 = [5/9, 8/9, 5/9]
+const GAUSS_POINTS_3x3 = ((5/9, -sqrt(3/5)), (8/9, 0.0), (5/9, sqrt(3/5)))
 
 # Shape functions for quadratic quadrilateral elements
 function shape_functions_quadratic(ξ, η)
-    N = [
+    N = SVector{8}(
         ξ*(ξ-1)*η*(η-1)/4,             # Node 1
         ξ*(ξ+1)*η*(η-1)/4,             # Node 2
         ξ*(ξ+1)*η*(η+1)/4,             # Node 3
@@ -30,13 +12,13 @@ function shape_functions_quadratic(ξ, η)
         ξ*(ξ+1)*(1-η^2)/2,             # Node 6 (midpoint of side 2-3)
         (1-ξ^2)*η*(η+1)/2,             # Node 7 (midpoint of side 3-4)
         ξ*(ξ-1)*(1-η^2)/2              # Node 8 (midpoint of side 4-1)
-    ]
+    )
     return N
 end
 
 # Shape function derivatives for quadratic quadrilateral elements
 function shape_function_derivatives_quadratic(ξ, η)
-    dN_dξ = [
+    dN_dξ = SVector{8}(
         (2*ξ-1)*η*(η-1)/4,             # Node 1
         (2*ξ+1)*η*(η-1)/4,             # Node 2
         (2*ξ+1)*η*(η+1)/4,             # Node 3
@@ -45,9 +27,8 @@ function shape_function_derivatives_quadratic(ξ, η)
         (2*ξ+1)*(1-η^2)/2,             # Node 6
         -2*ξ*η*(η+1)/2,                # Node 7
         (2*ξ-1)*(1-η^2)/2              # Node 8
-    ]
-
-    dN_dη = [
+    )
+    dN_dη = SVector{8}(
         ξ*(ξ-1)*(2*η-1)/4,             # Node 1
         ξ*(ξ+1)*(2*η-1)/4,             # Node 2
         ξ*(ξ+1)*(2*η+1)/4,             # Node 3
@@ -56,22 +37,35 @@ function shape_function_derivatives_quadratic(ξ, η)
         ξ*(ξ+1)*(-2*η)/2,              # Node 6
         (1-ξ^2)*(2*η+1)/2,             # Node 7
         ξ*(ξ-1)*(-2*η)/2               # Node 8
-    ]
+    )
 
     return dN_dξ, dN_dη
 end
 
 # Function to calculate the element stiffness matrix for a quadratic quadrilateral element using Gaussian quadrature
-function element_stiffness_quadratic(nodes, element, D)
-    Ke = zeros(16, 16)  # Initialize element stiffness matrix (16x16 for a quadratic quadrilateral element)
+function element_stiffness_quadratic(nodes, element, D, thickness)
+    Ke = zeros(MMatrix{16,16})  # Initialize element stiffness matrix (16x16 for a quadratic quadrilateral element)
+    node_positions_transposed = SMatrix{8,2}(nodes[:, element]')
 
-    for ξ in GAUSS_POINTS_3x3, η in GAUSS_POINTS_3x3
+    for (wξ, ξ) in GAUSS_POINTS_3x3, (wη, η) in GAUSS_POINTS_3x3
         # Get shape function derivatives in natural coordinates
         dN_dξ, dN_dη = shape_function_derivatives_quadratic(ξ, η)
 
         # Calculate the Jacobian matrix and its determinant
-        J = [sum(dN_dξ[i] * nodes[1, element[i]] for i in 1:8)  sum(dN_dξ[i] * nodes[2, element[i]] for i in 1:8);
-             sum(dN_dη[i] * nodes[1, element[i]] for i in 1:8)  sum(dN_dη[i] * nodes[2, element[i]] for i in 1:8)]
+        # J = [sum(dN_dξ[i] * nodes[1, element[i]] for i in 1:8)  sum(dN_dξ[i] * nodes[2, element[i]] for i in 1:8);
+        #      sum(dN_dη[i] * nodes[1, element[i]] for i in 1:8)  sum(dN_dη[i] * nodes[2, element[i]] for i in 1:8)]
+        # J = SMatrix{2,2}(sum(dN_dξ[i] * nodes[1, element[i]] for i in 1:9),
+        #                  sum(dN_dξ[i] * nodes[2, element[i]] for i in 1:9),
+        #                  sum(dN_dη[i] * nodes[1, element[i]] for i in 1:9),
+        #                  sum(dN_dη[i] * nodes[2, element[i]] for i in 1:9))
+        J = SMatrix{2,8}(dN_dξ[1], dN_dη[1],
+                         dN_dξ[2], dN_dη[2],
+                         dN_dξ[3], dN_dη[3],
+                         dN_dξ[4], dN_dη[4],
+                         dN_dξ[5], dN_dη[5],
+                         dN_dξ[6], dN_dη[6],
+                         dN_dξ[7], dN_dη[7],
+                         dN_dξ[8], dN_dη[8]) * node_positions_transposed
 
         detJ = det(J)  # Determinant of the Jacobian
         invJ = inv(J)  # Inverse of the Jacobian
@@ -81,19 +75,35 @@ function element_stiffness_quadratic(nodes, element, D)
         dN_dy = invJ[2, 1] * dN_dξ .+ invJ[2, 2] * dN_dη
 
         # Construct the B matrix (strain-displacement matrix)
-        B = zeros(3, 16)
-        for i in 1:8
-            B[1, 2*i-1] = dN_dx[i]
-            B[2, 2*i]   = dN_dy[i]
-            B[3, 2*i-1] = dN_dy[i]
-            B[3, 2*i]   = dN_dx[i]
-        end
+        # B = zeros(MMatrix{3,16})
+        # for i in 1:8
+        #     B[1, 2*i-1] = dN_dx[i]
+        #     B[2, 2*i]   = dN_dy[i]
+        #     B[3, 2*i-1] = dN_dy[i]
+        #     B[3, 2*i]   = dN_dx[i]
+        # end
+        B = SMatrix{3,16}(dN_dx[1], 0.0, dN_dy[1],
+                          0.0, dN_dy[1], dN_dx[1],
+                          dN_dx[2], 0.0, dN_dy[2],
+                          0.0, dN_dy[2], dN_dx[2],
+                          dN_dx[3], 0.0, dN_dy[3],
+                          0.0, dN_dy[3], dN_dx[3],
+                          dN_dx[4], 0.0, dN_dy[4],
+                          0.0, dN_dy[4], dN_dx[4],
+                          dN_dx[5], 0.0, dN_dy[5],
+                          0.0, dN_dy[5], dN_dx[5],
+                          dN_dx[6], 0.0, dN_dy[6],
+                          0.0, dN_dy[6], dN_dx[6],
+                          dN_dx[7], 0.0, dN_dy[7],
+                          0.0, dN_dy[7], dN_dx[7],
+                          dN_dx[8], 0.0, dN_dy[8],
+                          0.0, dN_dy[8], dN_dx[8])
 
         # Weighting factor (Jacobian determinant and Gauss weights)
-        weight = detJ * GAUSS_WEIGHTS_3x3[findfirst(GAUSS_POINTS_3x3 .== ξ)] * GAUSS_WEIGHTS_3x3[findfirst(GAUSS_POINTS_3x3 .== η)]
+        weight = detJ * wξ * wη
 
         # Contribution to the element stiffness matrix
-        Ke += weight * B' * D * B
+        Ke += thickness * weight * B' * D * B
     end
 
     return Ke
@@ -106,9 +116,25 @@ function assemble_global_stiffness_quadratic(nodes, elements, material)
     D = plane_stress_stiffness(material)   # Material stiffness matrix
 
     for element in eachcol(elements)
-        Ke = element_stiffness_quadratic(nodes, element, D)
+        Ke = element_stiffness_quadratic(nodes, element, D, material.thickness)
         # Global node indices
-        dofs = vcat(2*element .- 1, 2*element) |> vec  # Degrees of freedom
+        dofs = zeros(Int, 16)
+        dofs[1] = get_dof(element[1], :x)
+        dofs[2] = get_dof(element[1], :y)
+        dofs[3] = get_dof(element[2], :x)
+        dofs[4] = get_dof(element[2], :y)
+        dofs[5] = get_dof(element[3], :x)
+        dofs[6] = get_dof(element[3], :y)
+        dofs[7] = get_dof(element[4], :x)
+        dofs[8] = get_dof(element[4], :y)
+        dofs[9] = get_dof(element[5], :x)
+        dofs[10] = get_dof(element[5], :y)
+        dofs[11] = get_dof(element[6], :x)
+        dofs[12] = get_dof(element[6], :y)
+        dofs[13] = get_dof(element[7], :x)
+        dofs[14] = get_dof(element[7], :y)
+        dofs[15] = get_dof(element[8], :x)
+        dofs[16] = get_dof(element[8], :y)
 
         # Add element stiffness to global stiffness matrix
         for i in 1:16, j in 1:16
@@ -119,27 +145,13 @@ function assemble_global_stiffness_quadratic(nodes, elements, material)
     return K
 end
 
-# Function to apply boundary conditions
-function apply_boundary_conditions!(K, f, fixed_dofs)
-    for dof in fixed_dofs
-        K[dof, :] .= 0.0
-        K[:, dof] .= 0.0
-        K[dof, dof] = 1.0
-        f[dof] = 0.0
-    end
-end
-
 # Main solver function for quadratic elements
 function solve_fem_quadratic(nodes, elements, material, forces, fixed_dofs)
     # Assemble global stiffness matrix
     K = assemble_global_stiffness_quadratic(nodes, elements, material)
 
     # Force vector
-    f = zeros(2 * size(nodes, 2))
-    for (node, force) in forces
-        f[2 * node - 1] = force[1]
-        f[2 * node] = force[2]
-    end
+    f = get_force_vector(nodes, forces)
 
     # Apply boundary conditions
     apply_boundary_conditions!(K, f, fixed_dofs)
@@ -147,17 +159,5 @@ function solve_fem_quadratic(nodes, elements, material, forces, fixed_dofs)
     # Solve for displacements
     u = K \ f
 
-    return reshape(u, 2, :)
+    return reshape(u, 2, :), K, f
 end
-
-# Example usage for quadratic elements
-nodes = [0.0  1.0  2.0  0.0  1.0  2.0  0.0  1.0;
-         0.0  0.0  0.0  1.0  1.0  1.0  2.0  2.0]
-elements = [1; 2; 3; 8; 4; 5; 6; 7;;]
-material = Material(200e9, 0.3)  # Steel properties (E, ν)
-forces = Dict(6 => (0.0, -1000.0))  # Apply a downward force at node 6
-fixed_dofs = [1, 2, 13, 14]  # Fix nodes 1 and 7 (x and y directions)
-
-# Solve the problem for quadratic elements
-u = solve_fem_quadratic(nodes, elements, material, forces, fixed_dofs)
-println("Displacements for quadratic elements: ", u)
