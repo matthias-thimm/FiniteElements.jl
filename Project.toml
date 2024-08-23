@@ -1,0 +1,7 @@
+name = "FiniteElements"
+uuid = "f72ea6c1-9429-492e-b448-20ee3dc25947"
+authors = ["Kai Partmann"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.6.7"
