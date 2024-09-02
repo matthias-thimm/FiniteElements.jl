@@ -14,6 +14,9 @@ nodes, elements, forces, fixed_dofs = create_cantilever_beam_linear(beam_length,
                                                                     applied_force)
 material = Material(1e5, 0.3, 6)
 u, K, f = solve_fem_linear(nodes, elements, material, forces, fixed_dofs)
+println("-- results linear elements --")
+println("number of elements: $(size(elements, 2))")
+println("minimum displacement: $(minimum(u[2, :]))")
 
 ## Post-Processing
 fig = Figure(size=(800, 300))
