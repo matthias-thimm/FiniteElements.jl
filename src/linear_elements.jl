@@ -1,15 +1,18 @@
 # 2x2 Gaussian quadrature points and weights
 const GAUSS_POINTS_2x2 = ((1.0, -1/sqrt(3)), (1.0, 1/sqrt(3)))
 
-# Shape functions and derivatives in natural coordinates (ξ, η)
-# function shape_functions_linear(ξ, η)
-#     N = SVector{4}((1 - ξ) * (1 - η) / 4,
-#                    (1 + ξ) * (1 - η) / 4,
-#                    (1 + ξ) * (1 + η) / 4,
-#                    (1 - ξ) * (1 + η) / 4)
-#     return N
-# end
-
+# Shape functions for linear quadrilateral elements in natural coordinates (ξ, η):
+#    N1 = (1 - ξ) * (1 - η) / 4
+#    N2 = (1 + ξ) * (1 - η) / 4
+#    N3 = (1 + ξ) * (1 + η) / 4
+#    N4 = (1 - ξ) * (1 + η) / 4
+#
+#    ◍---------◍
+#   4|        3|
+#    |         |
+#    |         |
+#    ◍---------◍
+#    1         2
 function shape_function_derivatives_linear(ξ, η)
     dN_dξ = SVector{4}(- (1 - η) / 4,  (1 - η) / 4,  (1 + η) / 4, - (1 + η) / 4)
     dN_dη = SVector{4}(- (1 - ξ) / 4, - (1 + ξ) / 4,  (1 + ξ) / 4,  (1 - ξ) / 4)

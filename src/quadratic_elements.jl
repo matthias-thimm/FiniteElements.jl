@@ -1,23 +1,23 @@
 # 3x3 Gaussian quadrature points and weights for quadratic elements
 const GAUSS_POINTS_3x3 = ((5 / 9, -sqrt(3 / 5)), (8 / 9, 0.0), (5 / 9, sqrt(3 / 5)))
 
-# Shape functions for quadratic quadrilateral elements
-# function shape_functions_quadratic(ξ, η)
-#     N = SVector{9}(
-#         0.25 * ξ * η * (ξ - 1) * (η - 1),                        # N1
-#         0.25 * ξ * η * (ξ + 1) * (η - 1),                        # N2
-#         0.25 * ξ * η * (ξ + 1) * (η + 1),                        # N3
-#         0.25 * ξ * η * (ξ - 1) * (η + 1),                        # N4
-#         -0.5 * (ξ + 1) * (ξ - 1) * η * (η - 1),                  # N5 (Mid-side on edge 1-2)
-#         -0.5 * ξ * (ξ + 1) * (η + 1) * (η - 1),                  # N6 (Mid-side on edge 2-3)
-#         -0.5 * (ξ + 1) * (ξ - 1) * η * (η + 1),                  # N7 (Mid-side on edge 3-4)
-#         -0.5 * ξ * (ξ - 1) * (η + 1) * (η - 1),                  # N8 (Mid-side on edge 4-1)
-#         (ξ + 1) * (ξ - 1) * (η + 1) * (η - 1)                    # N9 (Center node)
-#     )
-#     return N
-# end
-
-# Shape function derivatives for quadratic quadrilateral elements
+# Shape functions for quadratic quadrilateral elements in natural coordinates (ξ, η):
+#    N1 = 0.25 * ξ * η * (ξ - 1) * (η - 1)
+#    N2 = 0.25 * ξ * η * (ξ + 1) * (η - 1)
+#    N3 = 0.25 * ξ * η * (ξ + 1) * (η + 1)
+#    N4 = 0.25 * ξ * η * (ξ - 1) * (η + 1)
+#    N5 = -0.5 * (ξ + 1) * (ξ - 1) * η * (η - 1)
+#    N6 = -0.5 * ξ * (ξ + 1) * (η + 1) * (η - 1)
+#    N7 = -0.5 * (ξ + 1) * (ξ - 1) * η * (η + 1)
+#    N8 = -0.5 * ξ * (ξ - 1) * (η + 1) * (η - 1)
+#    N9 = (ξ + 1) * (ξ - 1) * (η + 1) * (η - 1)
+#
+#    ◍----◍----◍
+#   4|   7    3|
+#    ◍    ◍    ◍
+#   8|   9    6|
+#    ◍----◍----◍
+#   1    5    2
 function shape_function_derivatives_quadratic(ξ, η)
     dN_dξ = SVector{9}(
         0.25 * η * (η - 1) * (2 * ξ - 1),                    # dN1/dξ
