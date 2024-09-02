@@ -38,3 +38,13 @@ u_analytical = analytical_displacement(applied_force, L, E, A)
 println("Numerical displacement at node 2: ", u[1, 2])
 println("Numerical displacement at node 3: ", u[1, 3])
 println("Analytical displacement: ", u_analytical)
+
+##
+include("plotting.jl")
+fig = Figure(size=(300, 300))
+ax1 = Axis(fig[1, 1]; aspect=DataAspect(), title="single element test")
+deformed_nodes = nodes .+ 10 .* u
+plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
+plot_nodes!(ax1, deformed_nodes; color=:black, markersize=7)
+save(joinpath("img", "single_element_test_linear.png"), fig; px_per_unit=2)
+fig

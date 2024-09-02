@@ -1,72 +1,70 @@
 # 3x3 Gaussian quadrature points and weights for quadratic elements
-const GAUSS_POINTS_3x3 = ((5/9, -sqrt(3/5)), (8/9, 0.0), (5/9, sqrt(3/5)))
+const GAUSS_POINTS_3x3 = ((5 / 9, -sqrt(3 / 5)), (8 / 9, 0.0), (5 / 9, sqrt(3 / 5)))
 
 # Shape functions for quadratic quadrilateral elements
-function shape_functions_quadratic(ξ, η)
-    N = SVector{8}(
-        ξ*(ξ-1)*η*(η-1)/4,             # Node 1
-        ξ*(ξ+1)*η*(η-1)/4,             # Node 2
-        ξ*(ξ+1)*η*(η+1)/4,             # Node 3
-        ξ*(ξ-1)*η*(η+1)/4,             # Node 4
-        (1-ξ^2)*η*(η-1)/2,             # Node 5 (midpoint of side 1-2)
-        ξ*(ξ+1)*(1-η^2)/2,             # Node 6 (midpoint of side 2-3)
-        (1-ξ^2)*η*(η+1)/2,             # Node 7 (midpoint of side 3-4)
-        ξ*(ξ-1)*(1-η^2)/2              # Node 8 (midpoint of side 4-1)
-    )
-    return N
-end
+# function shape_functions_quadratic(ξ, η)
+#     N = SVector{9}(
+#         0.25 * ξ * η * (ξ - 1) * (η - 1),                        # N1
+#         0.25 * ξ * η * (ξ + 1) * (η - 1),                        # N2
+#         0.25 * ξ * η * (ξ + 1) * (η + 1),                        # N3
+#         0.25 * ξ * η * (ξ - 1) * (η + 1),                        # N4
+#         -0.5 * (ξ + 1) * (ξ - 1) * η * (η - 1),                  # N5 (Mid-side on edge 1-2)
+#         -0.5 * ξ * (ξ + 1) * (η + 1) * (η - 1),                  # N6 (Mid-side on edge 2-3)
+#         -0.5 * (ξ + 1) * (ξ - 1) * η * (η + 1),                  # N7 (Mid-side on edge 3-4)
+#         -0.5 * ξ * (ξ - 1) * (η + 1) * (η - 1),                  # N8 (Mid-side on edge 4-1)
+#         (ξ + 1) * (ξ - 1) * (η + 1) * (η - 1)                    # N9 (Center node)
+#     )
+#     return N
+# end
 
 # Shape function derivatives for quadratic quadrilateral elements
 function shape_function_derivatives_quadratic(ξ, η)
-    dN_dξ = SVector{8}(
-        (2*ξ-1)*η*(η-1)/4,             # Node 1
-        (2*ξ+1)*η*(η-1)/4,             # Node 2
-        (2*ξ+1)*η*(η+1)/4,             # Node 3
-        (2*ξ-1)*η*(η+1)/4,             # Node 4
-        -2*ξ*η*(η-1)/2,                # Node 5
-        (2*ξ+1)*(1-η^2)/2,             # Node 6
-        -2*ξ*η*(η+1)/2,                # Node 7
-        (2*ξ-1)*(1-η^2)/2              # Node 8
+    dN_dξ = SVector{9}(
+        0.25 * η * (η - 1) * (2 * ξ - 1),                    # dN1/dξ
+        0.25 * η * (η - 1) * (2 * ξ + 1),                    # dN2/dξ
+        0.25 * η * (η + 1) * (2 * ξ + 1),                    # dN3/dξ
+        0.25 * η * (η + 1) * (2 * ξ - 1),                    # dN4/dξ
+        -η * (η - 1) * ξ,                                    # dN5/dξ (Mid-side on edge 1-2)
+        -0.5 * (η - 1) * (η + 1) * (2 * ξ + 1),              # dN6/dξ (Mid-side on edge 2-3)
+        -η * (η + 1) * ξ,                                    # dN7/dξ (Mid-side on edge 3-4)
+        -0.5 * (η - 1) * (η + 1) * (2 * ξ - 1),              # dN8/dξ (Mid-side on edge 4-1)
+        2 * ξ * (η + 1) * (η - 1)                            # dN9/dξ (Center node)
     )
-    dN_dη = SVector{8}(
-        ξ*(ξ-1)*(2*η-1)/4,             # Node 1
-        ξ*(ξ+1)*(2*η-1)/4,             # Node 2
-        ξ*(ξ+1)*(2*η+1)/4,             # Node 3
-        ξ*(ξ-1)*(2*η+1)/4,             # Node 4
-        (1-ξ^2)*(2*η-1)/2,             # Node 5
-        ξ*(ξ+1)*(-2*η)/2,              # Node 6
-        (1-ξ^2)*(2*η+1)/2,             # Node 7
-        ξ*(ξ-1)*(-2*η)/2               # Node 8
+    dN_dη = SVector{9}(
+        0.25 * ξ * (ξ - 1) * (2 * η - 1),                    # dN1/dη
+        0.25 * ξ * (ξ + 1) * (2 * η - 1),                    # dN2/dη
+        0.25 * ξ * (ξ + 1) * (2 * η + 1),                    # dN3/dη
+        0.25 * ξ * (ξ - 1) * (2 * η + 1),                    # dN4/dη
+        -0.5 * (ξ - 1) * (ξ + 1) * (2 * η - 1),              # dN5/dη (Mid-side on edge 1-2)
+        -ξ * (ξ + 1) * η,                                    # dN6/dη (Mid-side on edge 2-3)
+        -0.5 * (ξ - 1) * (ξ + 1) * (2 * η + 1),              # dN7/dη (Mid-side on edge 3-4)
+        -ξ * (ξ - 1) * η,                                    # dN8/dη (Mid-side on edge 4-1)
+        2 * η * (ξ + 1) * (ξ - 1)                            # dN9/dη (Center node)
     )
-
     return dN_dξ, dN_dη
 end
 
-# Function to calculate the element stiffness matrix for a quadratic quadrilateral element using Gaussian quadrature
+# Function to calculate the element stiffness matrix for a quadratic quadrilateral element
+# using Gaussian quadrature
 function element_stiffness_quadratic(nodes, element, D, thickness)
-    Ke = zeros(MMatrix{16,16})  # Initialize element stiffness matrix (16x16 for a quadratic quadrilateral element)
-    node_positions_transposed = SMatrix{8,2}(nodes[:, element]')
+    # Initialize element stiffness matrix (18x18 for a quadratic quadrilateral element)
+    Ke = zeros(MMatrix{18,18})
+    node_positions_transposed = @views SMatrix{9,2}(nodes[:, element]')
 
     for (wξ, ξ) in GAUSS_POINTS_3x3, (wη, η) in GAUSS_POINTS_3x3
         # Get shape function derivatives in natural coordinates
         dN_dξ, dN_dη = shape_function_derivatives_quadratic(ξ, η)
 
         # Calculate the Jacobian matrix and its determinant
-        # J = [sum(dN_dξ[i] * nodes[1, element[i]] for i in 1:8)  sum(dN_dξ[i] * nodes[2, element[i]] for i in 1:8);
-        #      sum(dN_dη[i] * nodes[1, element[i]] for i in 1:8)  sum(dN_dη[i] * nodes[2, element[i]] for i in 1:8)]
-        # J = SMatrix{2,2}(sum(dN_dξ[i] * nodes[1, element[i]] for i in 1:9),
-        #                  sum(dN_dξ[i] * nodes[2, element[i]] for i in 1:9),
-        #                  sum(dN_dη[i] * nodes[1, element[i]] for i in 1:9),
-        #                  sum(dN_dη[i] * nodes[2, element[i]] for i in 1:9))
-        J = SMatrix{2,8}(dN_dξ[1], dN_dη[1],
+        J = SMatrix{2,9}(dN_dξ[1], dN_dη[1],
                          dN_dξ[2], dN_dη[2],
                          dN_dξ[3], dN_dη[3],
                          dN_dξ[4], dN_dη[4],
                          dN_dξ[5], dN_dη[5],
                          dN_dξ[6], dN_dη[6],
                          dN_dξ[7], dN_dη[7],
-                         dN_dξ[8], dN_dη[8]) * node_positions_transposed
-
+                         dN_dξ[8], dN_dη[8],
+                         dN_dξ[9], dN_dη[9]) * node_positions_transposed
         detJ = det(J)  # Determinant of the Jacobian
         invJ = inv(J)  # Inverse of the Jacobian
 
@@ -75,14 +73,7 @@ function element_stiffness_quadratic(nodes, element, D, thickness)
         dN_dy = invJ[2, 1] * dN_dξ .+ invJ[2, 2] * dN_dη
 
         # Construct the B matrix (strain-displacement matrix)
-        # B = zeros(MMatrix{3,16})
-        # for i in 1:8
-        #     B[1, 2*i-1] = dN_dx[i]
-        #     B[2, 2*i]   = dN_dy[i]
-        #     B[3, 2*i-1] = dN_dy[i]
-        #     B[3, 2*i]   = dN_dx[i]
-        # end
-        B = SMatrix{3,16}(dN_dx[1], 0.0, dN_dy[1],
+        B = SMatrix{3,18}(dN_dx[1], 0.0, dN_dy[1],
                           0.0, dN_dy[1], dN_dx[1],
                           dN_dx[2], 0.0, dN_dy[2],
                           0.0, dN_dy[2], dN_dx[2],
@@ -97,7 +88,9 @@ function element_stiffness_quadratic(nodes, element, D, thickness)
                           dN_dx[7], 0.0, dN_dy[7],
                           0.0, dN_dy[7], dN_dx[7],
                           dN_dx[8], 0.0, dN_dy[8],
-                          0.0, dN_dy[8], dN_dx[8])
+                          0.0, dN_dy[8], dN_dx[8],
+                          dN_dx[9], 0.0, dN_dy[9],
+                          0.0, dN_dy[9], dN_dx[9])
 
         # Weighting factor (Jacobian determinant and Gauss weights)
         weight = detJ * wξ * wη
@@ -117,32 +110,29 @@ function assemble_global_stiffness_quadratic(nodes, elements, material)
 
     for element in eachcol(elements)
         Ke = element_stiffness_quadratic(nodes, element, D, material.thickness)
+
         # Global node indices
-        dofs = zeros(Int, 16)
-        dofs[1] = get_dof(element[1], :x)
-        dofs[2] = get_dof(element[1], :y)
-        dofs[3] = get_dof(element[2], :x)
-        dofs[4] = get_dof(element[2], :y)
-        dofs[5] = get_dof(element[3], :x)
-        dofs[6] = get_dof(element[3], :y)
-        dofs[7] = get_dof(element[4], :x)
-        dofs[8] = get_dof(element[4], :y)
-        dofs[9] = get_dof(element[5], :x)
-        dofs[10] = get_dof(element[5], :y)
-        dofs[11] = get_dof(element[6], :x)
-        dofs[12] = get_dof(element[6], :y)
-        dofs[13] = get_dof(element[7], :x)
-        dofs[14] = get_dof(element[7], :y)
-        dofs[15] = get_dof(element[8], :x)
-        dofs[16] = get_dof(element[8], :y)
+        dofs = get_dofs_quadratic(element)
 
         # Add element stiffness to global stiffness matrix
-        for i in 1:16, j in 1:16
+        for i in 1:18, j in 1:18
             K[dofs[i], dofs[j]] += Ke[i, j]
         end
     end
 
     return K
+end
+
+function get_dofs_quadratic(element)
+    return SVector{18}(get_dof(element[1], :x), get_dof(element[1], :y),
+                       get_dof(element[2], :x), get_dof(element[2], :y),
+                       get_dof(element[3], :x), get_dof(element[3], :y),
+                       get_dof(element[4], :x), get_dof(element[4], :y),
+                       get_dof(element[5], :x), get_dof(element[5], :y),
+                       get_dof(element[6], :x), get_dof(element[6], :y),
+                       get_dof(element[7], :x), get_dof(element[7], :y),
+                       get_dof(element[8], :x), get_dof(element[8], :y),
+                       get_dof(element[9], :x), get_dof(element[9], :y))
 end
 
 # Main solver function for quadratic elements
