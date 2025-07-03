@@ -3,6 +3,7 @@ struct Material
     E::Float64  # Young's modulus
     ν::Float64  # Poisson's ratio
     thickness::Float64  # Thickness of the structure
+    density::Float64 # Density of Material
 end
 
 function plane_stress_stiffness(material::Material)
