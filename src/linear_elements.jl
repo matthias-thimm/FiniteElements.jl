@@ -62,6 +62,50 @@ function element_stiffness_linear(nodes, element, D, thickness)
     return Ke
 end
 
+# Function to calculate the element stiffness matrix for a quadrilateral element using
+# Gaussian quadrature, with u for stress calculation in iterative methods
+function element_stiffness_linear(nodes, element, D, thickness, u)
+    # Initialize element stiffness matrix (8x8 for a quadrilateral element)
+    Ke = zeros(SMatrix{8,8})
+    node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')
+
+    for (wξ, ξ) in GAUSS_POINTS_2x2, (wη, η) in GAUSS_POINTS_2x2
+        # Get shape function derivatives in natural coordinates
+        dN_dξ, dN_dη = shape_function_derivatives_linear(ξ, η)
+
+        # Calculate the Jacobian matrix and its determinant
+        J = SMatrix{2,4}(dN_dξ[1], dN_dη[1],
+                         dN_dξ[2], dN_dη[2],
+                         dN_dξ[3], dN_dη[3],
+                         dN_dξ[4], dN_dη[4]) * node_positions_transposed
+        detJ = det(J)  # Determinant of the Jacobian
+        invJ = inv(J)  # Inverse of the Jacobian
+
+        # Derivatives of shape functions with respect to global coordinates (x, y)
+        dN_dx = invJ[1, 1] * dN_dξ .+ invJ[1, 2] * dN_dη
+        dN_dy = invJ[2, 1] * dN_dξ .+ invJ[2, 2] * dN_dη
+
+        # Construct the B matrix (strain-displacement matrix)
+        B = SMatrix{3,8}(dN_dx[1], 0.0, dN_dy[1],
+                         0.0, dN_dy[1], dN_dx[1],
+                         dN_dx[2], 0.0, dN_dy[2],
+                         0.0, dN_dy[2], dN_dx[2],
+                         dN_dx[3], 0.0, dN_dy[3],
+                         0.0, dN_dy[3], dN_dx[3],
+                         dN_dx[4], 0.0, dN_dy[4],
+                         0.0, dN_dy[4], dN_dx[4])
+
+        # Weighting factor (Jacobian determinant and Gauss weights)
+        weight = detJ * wξ * wη
+        σ[i, :] += B*u[get_dofs_linear(element)]
+
+        # Contribution to the element stiffness matrix
+        Ke += thickness * weight * B' * D * B
+    end
+    σ[i,:] /= 1/4
+    return Ke, σ
+end
+
 
 # Function to assemble the global stiffness matrix
 function assemble_global_stiffness_linear(nodes, elements, material)
@@ -71,6 +115,27 @@ function assemble_global_stiffness_linear(nodes, elements, material)
 
     for element in eachcol(elements)
         Ke = element_stiffness_linear(nodes, element, D, material.thickness)
+
+        # Global node indices
+        dofs = get_dofs_linear(element)
+
+        # Add element stiffness to global stiffness matrix
+        for i in 1:8, j in 1:8
+            K[dofs[i], dofs[j]] += Ke[i, j]
+        end
+    end
+
+    return K
+end
+
+# Function to assemble the global stiffness matrix with stress calculation for iterative methods
+function assemble_global_stiffness_linear(nodes, elements, material, u)
+    n_nodes = size(nodes, 2)
+    K = spzeros(2 * n_nodes, 2 * n_nodes)  # Global stiffness matrix
+    D = plane_stress_stiffness(material)   # Material stiffness matrix
+
+    for element in eachcol(elements)
+        Ke = element_stiffness_linear(nodes, element, D, material.thickness, u)
 
         # Global node indices
         dofs = get_dofs_linear(element)
