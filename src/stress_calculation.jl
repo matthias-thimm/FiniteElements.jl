@@ -51,7 +51,6 @@ end
 
 # Main solver function
 function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixed_dofs, n_timesteps, Δt)
-    include("plotting.jl")
     # Newmark-Beta-Methode
     # Spezialfälle: β = 1/4, γ = 1/2, implizit und bedingungslos stabil.
     #               β = 1/6, γ = 1/2, lineare Beschleunigungsmethode
@@ -152,7 +151,7 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
         u_nodes = reshape(u, 2, :)
 
         ## Post-Processing
-        fig = Makie.Figure(size=(800, 300))
+        fig = Figure(size=(800, 300))
         ax1 = Axis(fig[1, 1]; aspect=DataAspect(), title="cantilever beam linear")
         deformed_nodes = nodes .+ 2 .* u_nodes
         num_nodes = size(u_nodes,2)
@@ -174,7 +173,7 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
         plot_mesh!(ax1, deformed_nodes, elements; color=node_colors)
         plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
         plot_nodes!(ax1, deformed_nodes; color=:black, markersize=7)
-        save(joinpath("img", "cantilever_beam_linear.png"), fig; px_per_unit=2)
+        save(joinpath("img", "cantilever_beam_linear_$t.png"), fig; px_per_unit=2)
     end
 
     #=n_nodes = size(nodes, 2)
