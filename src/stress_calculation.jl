@@ -92,7 +92,6 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
             u_pred = u + Δt*v + (Δt^2)/2*(1-2*β)*a
             v_pred = v + Δt*(1-γ)*a
         end
-        println(maximum(u_pred-u))
         #Predictors finished.
 
         # Assemble global stiffness matrix
@@ -108,7 +107,6 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
                                     # Mü      + Ku = f(t)
                                     # Mü           = f(t) - Ku
                                     #  ü            = 1/M*(f(t) - Ku)
-        #@autoinfiltrate
         a = 2*ndofs/mass*(f-K*u)
 
         #Calculate u_n+1 and v_n+1 from a_n+1
@@ -154,7 +152,6 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
             σ[i,:] /= 4
             D = plane_stress_stiffness(material)
             σ[i,:] =  D * σ[i,:]
-            #println("Die Spannungen für Element $i lauten", σ[i,:])
         end
 
         u_nodes = reshape(u, 2, :)
@@ -169,15 +166,15 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
 
             for (i, element) in enumerate(eachcol(elements))
                 for n in elements[:, i]
-                    node_colors[n] += u[i,1]
+                    node_colors[n] += σ[i,1]
                 end
             end
 
-            #=for n in 1:num_nodes
+            for n in 1:num_nodes
                 if counts[n] > 0
                     node_colors[n] /= counts[n]
                 end
-            end=#
+            end
 
             plot_mesh!(ax1, deformed_nodes, elements; color=node_colors)
             plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
