@@ -50,7 +50,7 @@ function solve_fem_linear_stress(nodes, elements, material, forces, fixed_dofs)
 end
 
 # Main solver function
-function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixed_dofs, n_timesteps, Δt)
+function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixed_dofs, n_timesteps, Δt, nx, ny, v_0)
     # Newmark-Beta-Methode
     # Spezialfälle: β = 1/4, γ = 1/2, implizit und bedingungslos stabil.
     #               β = 1/6, γ = 1/2, lineare Beschleunigungsmethode
@@ -73,9 +73,17 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
     v = zeros(size(nodes, 2)*2)
     a = zeros(size(nodes, 2)*2)
 
+    n_nodes_x = nx + 1
+    n_nodes_y = ny + 1
+    right_side_nodes = [(n_nodes_x * (j - 1) + n_nodes_x) for j in 1:n_nodes_y]
+    for node in right_side_nodes
+        v[2*node-1:2*node] = v_0
+    end
+
     a_old = a
 
     for t = 1:n_timesteps
+        println("timestep: $t/$n_timesteps")
         #Calculating predictors
         if β == 0.0 && γ == 0.5
             u_pred = u + Δt*v + Δt^2/2*a
@@ -84,6 +92,7 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
             u_pred = u + Δt*v + (Δt^2)/2*(1-2*β)*a
             v_pred = v + Δt*(1-γ)*a
         end
+        println(maximum(u_pred-u))
         #Predictors finished.
 
         # Assemble global stiffness matrix
@@ -145,35 +154,36 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
             σ[i,:] /= 4
             D = plane_stress_stiffness(material)
             σ[i,:] =  D * σ[i,:]
-            println("Die Spannungen für Element $i lauten", σ[i,:])
+            #println("Die Spannungen für Element $i lauten", σ[i,:])
         end
 
         u_nodes = reshape(u, 2, :)
+        if mod(t,100) == 0
+            ## Post-Processing
+            fig = Figure(size=(800, 300))
+            ax1 = Axis(fig[1, 1]; aspect=DataAspect(), title="cantilever beam linear")
+            deformed_nodes = nodes .+ 100 .* u_nodes
+            num_nodes = size(u_nodes,2)
+            node_colors = zeros(Float64, num_nodes)
+            counts = zeros(Int, num_nodes)
 
-        ## Post-Processing
-        fig = Figure(size=(800, 300))
-        ax1 = Axis(fig[1, 1]; aspect=DataAspect(), title="cantilever beam linear")
-        deformed_nodes = nodes .+ 2 .* u_nodes
-        num_nodes = size(u_nodes,2)
-        node_colors = zeros(Float64, num_nodes)
-        counts = zeros(Int, num_nodes)
-
-        for (i, element) in enumerate(eachcol(elements))
-            for n in elements[:, i]
-                node_colors[n] += σ[i,1]
+            for (i, element) in enumerate(eachcol(elements))
+                for n in elements[:, i]
+                    node_colors[n] += u[i,1]
+                end
             end
-        end
 
-        for n in 1:num_nodes
-            if counts[n] > 0
-                node_colors[n] /= counts[n]
-            end
-        end
+            #=for n in 1:num_nodes
+                if counts[n] > 0
+                    node_colors[n] /= counts[n]
+                end
+            end=#
 
-        plot_mesh!(ax1, deformed_nodes, elements; color=node_colors)
-        plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
-        plot_nodes!(ax1, deformed_nodes; color=:black, markersize=7)
-        save(joinpath("img", "cantilever_beam_linear_$t.png"), fig; px_per_unit=2)
+            plot_mesh!(ax1, deformed_nodes, elements; color=node_colors)
+            plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
+            plot_nodes!(ax1, deformed_nodes; color=:black, markersize=7)
+            save(joinpath("img", "cantilever_beam_linear_$t.png"), fig; px_per_unit=2)
+        end
     end
 
     #=n_nodes = size(nodes, 2)
