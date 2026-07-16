@@ -13,25 +13,28 @@ function solve_fem_linear_stress(nodes, elements, material, forces, fixed_dofs)
     u = K \ f
 
     n_nodes = size(nodes, 2)
-    K = spzeros(2 * n_nodes, 2 * n_nodes)  # Global stiffness matrix
     σ = zeros(size(elements, 2), 3)
+    D = plane_stress_stiffness(material)
+
     for (i,element) in enumerate(eachcol(elements))
-        node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')  
+        node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')
+        strain_element = zeros(3)  # Accumulated strain
+
         for (wξ, ξ) in GAUSS_POINTS_2x2, (wη, η) in GAUSS_POINTS_2x2
             # Get shape function derivatives in natural coordinates
             dN_dξ, dN_dη = shape_function_derivatives_linear(ξ, η)
-        
+
             # Calculate the Jacobian matrix and its determinant
             J = SMatrix{2,4}(dN_dξ[1], dN_dη[1],
                              dN_dξ[2], dN_dη[2],
                              dN_dξ[3], dN_dη[3],
                              dN_dξ[4], dN_dη[4]) * node_positions_transposed
             invJ = inv(J)  # Inverse of the Jacobian
-        
+
             # Derivatives of shape functions with respect to global coordinates (x, y)
             dN_dx = invJ[1, 1] * dN_dξ .+ invJ[1, 2] * dN_dη
             dN_dy = invJ[2, 1] * dN_dξ .+ invJ[2, 2] * dN_dη
-        
+
             # Construct the B matrix (strain-displacement matrix)
             B = SMatrix{3,8}(dN_dx[1], 0.0, dN_dy[1],
                              0.0, dN_dy[1], dN_dx[1],
@@ -41,16 +44,19 @@ function solve_fem_linear_stress(nodes, elements, material, forces, fixed_dofs)
                              0.0, dN_dy[3], dN_dx[3],
                              dN_dx[4], 0.0, dN_dy[4],
                              0.0, dN_dy[4], dN_dx[4])
-            σ[i, :] += B*u[get_dofs_linear(element)]
+            strain_element += B*u[get_dofs_linear(element)]
         end
-        σ[i,:] /= 1/4
-        println("Die Spannungen für Element $i lauten", σ[i,:])
+        # Average strain over Gauss points
+        strain_element /= 4
+        # Calculate stress: σ = D * ε
+        σ[i, :] = D * strain_element
+        println("Die Spannungen für Element $i lauten: ", σ[i,:])
     end
     return reshape(u, 2, :), K, f, σ
 end
 
 # Main solver function
-function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixed_dofs, n_timesteps, Δt, nx, ny, v_0)
+function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixed_dofs, n_timesteps, Δt)
     # Newmark-Beta-Methode
     # Spezialfälle: β = 1/4, γ = 1/2, implizit und bedingungslos stabil.
     #               β = 1/6, γ = 1/2, lineare Beschleunigungsmethode
@@ -73,17 +79,9 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
     v = zeros(size(nodes, 2)*2)
     a = zeros(size(nodes, 2)*2)
 
-    n_nodes_x = nx + 1
-    n_nodes_y = ny + 1
-    right_side_nodes = [(n_nodes_x * (j - 1) + n_nodes_x) for j in 1:n_nodes_y]
-    for node in right_side_nodes
-        v[2*node-1:2*node] = v_0
-    end
-
     a_old = a
 
     for t = 1:n_timesteps
-        println("timestep: $t/$n_timesteps")
         #Calculating predictors
         if β == 0.0 && γ == 0.5
             u_pred = u + Δt*v + Δt^2/2*a
@@ -107,6 +105,7 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
                                     # Mü      + Ku = f(t)
                                     # Mü           = f(t) - Ku
                                     #  ü            = 1/M*(f(t) - Ku)
+        #@autoinfiltrate
         a = 2*ndofs/mass*(f-K*u)
 
         #Calculate u_n+1 and v_n+1 from a_n+1
@@ -122,22 +121,22 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
         K = spzeros(2 * n_nodes, 2 * n_nodes)  # Global stiffness matrix
         σ = zeros(size(elements, 2), 3)
         for (i,element) in enumerate(eachcol(elements)) # Elementweise Spannungsberechnung
-            node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')  
+            node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')
             for (wξ, ξ) in GAUSS_POINTS_2x2, (wη, η) in GAUSS_POINTS_2x2
                 # Get shape function derivatives in natural coordinates
                 dN_dξ, dN_dη = shape_function_derivatives_linear(ξ, η)
-            
+
                 # Calculate the Jacobian matrix and its determinant
                 J = SMatrix{2,4}(dN_dξ[1], dN_dη[1],
                                 dN_dξ[2], dN_dη[2],
                                 dN_dξ[3], dN_dη[3],
                                 dN_dξ[4], dN_dη[4]) * node_positions_transposed
                 invJ = inv(J)  # Inverse of the Jacobian
-            
+
                 # Derivatives of shape functions with respect to global coordinates (x, y)
                 dN_dx = invJ[1, 1] * dN_dξ .+ invJ[1, 2] * dN_dη
                 dN_dy = invJ[2, 1] * dN_dξ .+ invJ[2, 2] * dN_dη
-            
+
                 # Construct the B matrix (strain-displacement matrix)
                 B = SMatrix{3,8}(dN_dx[1], 0.0, dN_dy[1],
                                 0.0, dN_dy[1], dN_dx[1],
@@ -152,23 +151,24 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
             σ[i,:] /= 4
             D = plane_stress_stiffness(material)
             σ[i,:] =  D * σ[i,:]
+            println("Die Spannungen für Element $i lauten", σ[i,:])
         end
 
         u_nodes = reshape(u, 2, :)
-        if mod(t,100) == 0
-            ## Post-Processing
-            fig = Figure(size=(800, 300))
-            ax1 = Axis(fig[1, 1]; aspect=DataAspect(), title="cantilever beam linear")
-            deformed_nodes = nodes .+ 100 .* u_nodes
-            num_nodes = size(u_nodes,2)
-            node_colors = zeros(Float64, num_nodes)
-            counts = zeros(Int, num_nodes)
 
-            for (i, element) in enumerate(eachcol(elements))
-                for n in elements[:, i]
-                    node_colors[n] += σ[i,1]
-                end
+        ## Post-Processing
+        fig = Figure(size=(800, 300))
+        ax1 = Axis(fig[1, 1]; aspect=DataAspect(), title="cantilever beam linear")
+        deformed_nodes = nodes .+ 2 .* u_nodes
+        num_nodes = size(u_nodes,2)
+        node_colors = zeros(Float64, num_nodes)
+        counts = zeros(Int, num_nodes)
+
+        for (i, element) in enumerate(eachcol(elements))
+            for n in elements[:, i]
+                node_colors[n] += σ[i,1]
             end
+        end
 
             for n in 1:num_nodes
                 if counts[n] > 0
@@ -176,33 +176,32 @@ function solve_fem_linear_stress_dynamic(nodes, elements, material, forces, fixe
                 end
             end
 
-            plot_mesh!(ax1, deformed_nodes, elements; color=node_colors)
-            plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
-            plot_nodes!(ax1, deformed_nodes; color=:black, markersize=7)
-            save(joinpath("img", "cantilever_beam_linear_$t.png"), fig; px_per_unit=2)
-        end
+        plot_mesh!(ax1, deformed_nodes, elements; color=node_colors)
+        plot_edges_linear!(ax1, deformed_nodes, elements; color=:black)
+        plot_nodes!(ax1, deformed_nodes; color=:black, markersize=7)
+        save(joinpath("img", "cantilever_beam_linear_$t.png"), fig; px_per_unit=2)
     end
 
     #=n_nodes = size(nodes, 2)
     K = spzeros(2 * n_nodes, 2 * n_nodes)  # Global stiffness matrix
     σ = zeros(size(elements, 2), 3)
     for (i,element) in enumerate(eachcol(elements))
-        node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')  
+        node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')
         for (wξ, ξ) in GAUSS_POINTS_2x2, (wη, η) in GAUSS_POINTS_2x2
             # Get shape function derivatives in natural coordinates
             dN_dξ, dN_dη = shape_function_derivatives_linear(ξ, η)
-        
+
             # Calculate the Jacobian matrix and its determinant
             J = SMatrix{2,4}(dN_dξ[1], dN_dη[1],
                              dN_dξ[2], dN_dη[2],
                              dN_dξ[3], dN_dη[3],
                              dN_dξ[4], dN_dη[4]) * node_positions_transposed
             invJ = inv(J)  # Inverse of the Jacobian
-        
+
             # Derivatives of shape functions with respect to global coordinates (x, y)
             dN_dx = invJ[1, 1] * dN_dξ .+ invJ[1, 2] * dN_dη
             dN_dy = invJ[2, 1] * dN_dξ .+ invJ[2, 2] * dN_dη
-        
+
             # Construct the B matrix (strain-displacement matrix)
             B = SMatrix{3,8}(dN_dx[1], 0.0, dN_dy[1],
                              0.0, dN_dy[1], dN_dx[1],

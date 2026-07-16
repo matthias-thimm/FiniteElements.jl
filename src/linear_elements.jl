@@ -149,6 +149,66 @@ function assemble_global_stiffness_linear(nodes, elements, material, u)
     return K
 end
 
+# Function to calculate the element mass matrix for a quadrilateral element using
+# Gaussian quadrature
+function element_mass_linear(nodes, element, material)
+    # Initialize element mass matrix (8x8 for a quadrilateral element)
+    Me = zeros(SMatrix{8,8})
+    node_positions_transposed = @views SMatrix{4,2}(nodes[:, element]')
+
+    for (wξ, ξ) in GAUSS_POINTS_2x2, (wη, η) in GAUSS_POINTS_2x2
+        # Get shape function values in natural coordinates
+        N1 = (1 - ξ) * (1 - η) / 4
+        N2 = (1 + ξ) * (1 - η) / 4
+        N3 = (1 + ξ) * (1 + η) / 4
+        N4 = (1 - ξ) * (1 + η) / 4
+
+        N = SVector{4}(N1, N2, N3, N4)
+
+        # Get shape function derivatives for Jacobian calculation
+        dN_dξ, dN_dη = shape_function_derivatives_linear(ξ, η)
+
+        # Calculate the Jacobian matrix and its determinant
+        J = SMatrix{2,4}(dN_dξ[1], dN_dη[1],
+                         dN_dξ[2], dN_dη[2],
+                         dN_dξ[3], dN_dη[3],
+                         dN_dξ[4], dN_dη[4]) * node_positions_transposed
+        detJ = det(J)  # Determinant of the Jacobian
+
+        # Construct the shape function matrix N for mass matrix
+        N_matrix = SMatrix{2,8}(N[1], 0.0, N[2], 0.0, N[3], 0.0, N[4], 0.0,
+                               0.0, N[1], 0.0, N[2], 0.0, N[3], 0.0, N[4])
+
+        # Weighting factor (Jacobian determinant and Gauss weights)
+        weight = detJ * wξ * wη
+
+        # Contribution to the element mass matrix
+        Me += material.density * material.thickness * weight * N_matrix' * N_matrix
+    end
+
+    return Me
+end
+
+# Function to assemble the global mass matrix
+function assemble_global_mass_linear(nodes, elements, material)
+    n_nodes = size(nodes, 2)
+    M = spzeros(2 * n_nodes, 2 * n_nodes)  # Global mass matrix
+
+    for element in eachcol(elements)
+        Me = element_mass_linear(nodes, element, material)
+
+        # Global node indices
+        dofs = get_dofs_linear(element)
+
+        # Add element mass to global mass matrix
+        for i in 1:8, j in 1:8
+            M[dofs[i], dofs[j]] += Me[i, j]
+        end
+    end
+
+    return M
+end
+
 function get_dofs_linear(element)
     return SVector{8}(get_dof(element[1], :x), get_dof(element[1], :y),
                       get_dof(element[2], :x), get_dof(element[2], :y),

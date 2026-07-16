@@ -6,6 +6,9 @@ struct Material
     density::Float64 # Density of Material
 end
 
+# Constructor with default density for backward compatibility
+Material(E, ν, thickness) = Material(E, ν, thickness, 7850.0)
+
 function plane_stress_stiffness(material::Material)
     (; E, ν) = material
     factor = E / (1.0 - ν^2)
